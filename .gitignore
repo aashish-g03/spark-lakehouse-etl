@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Spark
+derby.log
+metastore_db/
+spark-warehouse/
+
+# Data (regenerable)
+data/raw/
+data/output/
+warehouse/
+*.parquet
