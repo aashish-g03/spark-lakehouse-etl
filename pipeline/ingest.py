@@ -30,7 +30,7 @@ def validate(df: DataFrame) -> tuple[DataFrame, DataFrame]:
     Quarantine reasons:
       - null transaction_id or customer_id
       - null or negative amount
-      - unrecognized currency code
+      - unrecognized currency code or transaction type
       - event_date that parses to null or is in the future
     """
     df = df.withColumn("_event_date", F.to_date(F.col("event_date")))
@@ -42,6 +42,7 @@ def validate(df: DataFrame) -> tuple[DataFrame, DataFrame]:
         & F.col("amount").isNotNull()
         & (F.col("amount") > 0)
         & F.col("currency").isin(list(VALID_CURRENCIES))
+        & F.col("transaction_type").isin(list(VALID_TXN_TYPES))
         & F.col("_event_date").isNotNull()
         & (F.col("_event_date") <= F.current_date())
     )

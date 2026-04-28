@@ -6,7 +6,7 @@ import shutil
 import pytest
 from pyspark.sql import SparkSession
 
-from pipeline.spark_session import WAREHOUSE_PATH
+from pipeline.spark_session import ICEBERG_VERSION, SPARK_MAJOR, WAREHOUSE_PATH
 
 
 @pytest.fixture(scope="session")
@@ -15,14 +15,16 @@ def spark():
     if os.path.exists(WAREHOUSE_PATH):
         shutil.rmtree(WAREHOUSE_PATH)
 
+    jar_coord = (
+        f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR}_2.12:"
+        f"{ICEBERG_VERSION}"
+    )
+
     session = (
         SparkSession.builder
         .appName("pipeline-tests")
         .master("local[2]")
-        .config(
-            "spark.jars.packages",
-            "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.7.1",
-        )
+        .config("spark.jars.packages", jar_coord)
         .config(
             "spark.sql.extensions",
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",

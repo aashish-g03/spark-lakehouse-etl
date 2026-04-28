@@ -1,5 +1,8 @@
 """Tests for the transform (silver) layer."""
 
+from decimal import Decimal
+from datetime import datetime
+
 from pyspark.sql import Row, functions as F
 
 from pipeline.transform import deduplicate, enrich, add_derived_columns
@@ -7,20 +10,29 @@ from pipeline.transform import deduplicate, enrich, add_derived_columns
 
 class TestDeduplicate:
 
-    def test_removes_exact_dupes(self, spark):
+    def test_removes_exact_dupes_keeps_latest(self, spark):
         data = [
-            Row(transaction_id="txn-1", amount=100.0),
-            Row(transaction_id="txn-1", amount=100.0),
-            Row(transaction_id="txn-2", amount=200.0),
+            Row(transaction_id="txn-1", amount=100.0,
+                event_timestamp=datetime(2026, 4, 1, 10, 0)),
+            Row(transaction_id="txn-1", amount=100.0,
+                event_timestamp=datetime(2026, 4, 1, 12, 0)),
+            Row(transaction_id="txn-2", amount=200.0,
+                event_timestamp=datetime(2026, 4, 1, 9, 0)),
         ]
         df = spark.createDataFrame(data)
         result = deduplicate(df)
         assert result.count() == 2
 
+        # Should keep the later timestamp for txn-1
+        txn1 = result.filter("transaction_id = 'txn-1'").first()
+        assert txn1.event_timestamp.hour == 12
+
     def test_no_dupes_unchanged(self, spark):
         data = [
-            Row(transaction_id="txn-1", amount=100.0),
-            Row(transaction_id="txn-2", amount=200.0),
+            Row(transaction_id="txn-1", amount=100.0,
+                event_timestamp=datetime(2026, 4, 1, 10, 0)),
+            Row(transaction_id="txn-2", amount=200.0,
+                event_timestamp=datetime(2026, 4, 1, 11, 0)),
         ]
         df = spark.createDataFrame(data)
         result = deduplicate(df)
@@ -61,16 +73,16 @@ class TestEnrich:
 class TestDerivedColumns:
 
     def test_usd_passthrough(self, spark):
-        df = spark.createDataFrame([Row(amount=100.0, currency="USD")])
+        df = spark.createDataFrame([Row(amount=Decimal("100.00"), currency="USD")])
         result = add_derived_columns(df)
-        assert result.first().amount_usd == 100.0
+        assert float(result.first().amount_usd) == 100.0
 
     def test_eur_conversion(self, spark):
-        df = spark.createDataFrame([Row(amount=100.0, currency="EUR")])
+        df = spark.createDataFrame([Row(amount=Decimal("100.00"), currency="EUR")])
         result = add_derived_columns(df)
-        assert result.first().amount_usd == 108.0
+        assert float(result.first().amount_usd) == 108.0
 
     def test_inr_conversion(self, spark):
-        df = spark.createDataFrame([Row(amount=10000.0, currency="INR")])
+        df = spark.createDataFrame([Row(amount=Decimal("10000.00"), currency="INR")])
         result = add_derived_columns(df)
-        assert result.first().amount_usd == 120.0
+        assert float(result.first().amount_usd) == 120.0

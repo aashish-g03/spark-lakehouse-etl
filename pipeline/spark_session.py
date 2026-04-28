@@ -6,8 +6,8 @@ All pipeline modules import get_spark() rather than building their own session.
 import os
 from pyspark.sql import SparkSession
 
-_ICEBERG_VERSION = "1.7.1"
-_SPARK_MAJOR = "3.5"
+ICEBERG_VERSION = "1.7.1"
+SPARK_MAJOR = "3.5"
 
 WAREHOUSE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -17,8 +17,8 @@ WAREHOUSE_PATH = os.path.join(
 
 def get_spark(app_name: str = "lakehouse-etl") -> SparkSession:
     jar_coord = (
-        f"org.apache.iceberg:iceberg-spark-runtime-{_SPARK_MAJOR}_2.12:"
-        f"{_ICEBERG_VERSION}"
+        f"org.apache.iceberg:iceberg-spark-runtime-{SPARK_MAJOR}_2.12:"
+        f"{ICEBERG_VERSION}"
     )
 
     return (

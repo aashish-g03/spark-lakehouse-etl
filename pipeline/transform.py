@@ -4,10 +4,10 @@ Silver layer: deduplicate, enrich with customer dimension via broadcast join.
 Expects the output of ingest.validate() — typed, quarantine-free records.
 """
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
-from pipeline.schemas import CUSTOMER_SCHEMA
+from pipeline.schemas import CUSTOMER_SCHEMA, FX_RATES_USD
 
 
 def load_customers(spark: SparkSession, path: str) -> DataFrame:
@@ -15,8 +15,20 @@ def load_customers(spark: SparkSession, path: str) -> DataFrame:
 
 
 def deduplicate(df: DataFrame) -> DataFrame:
-    """Drop exact duplicates on transaction_id, keeping the first occurrence."""
-    return df.dropDuplicates(["transaction_id"])
+    """
+    Deduplicate on transaction_id, keeping the latest record by event_timestamp.
+    Using a window function instead of dropDuplicates so the result is
+    deterministic and reproducible across runs.
+    """
+    window = Window.partitionBy("transaction_id").orderBy(
+        F.col("event_timestamp").desc()
+    )
+    return (
+        df
+        .withColumn("_row_num", F.row_number().over(window))
+        .filter(F.col("_row_num") == 1)
+        .drop("_row_num")
+    )
 
 
 def enrich(transactions: DataFrame, customers: DataFrame) -> DataFrame:
@@ -39,17 +51,14 @@ def enrich(transactions: DataFrame, customers: DataFrame) -> DataFrame:
 
 
 def add_derived_columns(df: DataFrame) -> DataFrame:
-    """Computed columns useful for downstream analytics."""
-    return (
-        df
-        .withColumn("amount_usd",
-                     F.when(F.col("currency") == "USD", F.col("amount"))
-                     .when(F.col("currency") == "EUR", F.col("amount") * 1.08)
-                     .when(F.col("currency") == "GBP", F.col("amount") * 1.27)
-                     .when(F.col("currency") == "INR", F.col("amount") * 0.012)
-                     .otherwise(F.col("amount")))
-        .withColumn("amount_usd", F.round("amount_usd", 2))
-    )
+    """Normalize amounts to USD using reference FX rates."""
+    fx_expr = F.col("amount")  # fallback: keep original
+    for currency, rate in FX_RATES_USD.items():
+        fx_expr = F.when(
+            F.col("currency") == currency, F.col("amount") * F.lit(rate)
+        ).otherwise(fx_expr)
+
+    return df.withColumn("amount_usd", F.round(fx_expr, 2))
 
 
 def transform(

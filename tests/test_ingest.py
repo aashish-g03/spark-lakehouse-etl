@@ -74,6 +74,14 @@ class TestIngestValidation:
         assert clean.count() == 0
         assert quarantine.count() == 1
 
+    def test_bad_transaction_type_quarantined(self, spark):
+        bad = {**self.GOOD_RECORD, "transaction_id": "txn-bad-6",
+               "transaction_type": "refund"}
+        path = _write_test_json([bad])
+        clean, quarantine = ingest(spark, path)
+        assert clean.count() == 0
+        assert quarantine.count() == 1
+
     def test_schema_evolution_channel_field(self, spark):
         """Records with the extra 'channel' field should still pass validation."""
         record_with_channel = {**self.GOOD_RECORD, "channel": "mobile"}
