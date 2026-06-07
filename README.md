@@ -137,3 +137,7 @@ spark-lakehouse-etl/
 - **Faker** - synthetic data generation with controlled quality defects
 - **chispa** - DataFrame assertion library for Spark tests
 - **pytest** - test framework
+
+## Author
+
+[Aashish Gupta](https://linkedin.com/in/aashish03) · Software Engineer @ [Leena AI](https://leena.ai) · [aashishgupta.tech](https://www.aashishgupta.tech)
